@@ -26,7 +26,9 @@ Entry fields:
   zero_label  text shown when value is 0 
   choices_from node containing a space-separated list of options
   choices     static options
-  min,max,step,unit,display_unit,scale   numeric UI hints (scale divides raw value for display)
+  min,max,step,scale   integers (NULL/absent when unset); scale divides raw value for display
+  unit,display_unit    strings (NULL/absent when unset)
+  risk                 "low" | "medium" | "high"; "high" nodes are confirmed by the UI before applying
   handler     named native handler in kmgr for multi-step writes
   bundle      entries sharing a bundle are applied together by the handler (one persisted record)
   write_order for paired nodes: "max_first_when_raising" | "min_first_when_lowering"

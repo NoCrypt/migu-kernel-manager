@@ -1,34 +1,56 @@
 # kmgr CLI / JSON protocol
 
 A reusable specification of the `kmgr` backend so the same contract can be implemented in another
-project. It is self-contained: a caller only needs to run the binary and parse JSON.
+project. It is self-contained: a caller only needs to run the binary and parse JSON. The registry
+schema that `tree` resolves is included as Appendix A.
 
 - **Binary:** `/data/adb/modules/kmgr/bin/kmgr` (static aarch64-linux-android, no runtime deps).
-- **Transport:** one process per command. The command prints a single JSON object to **stdout** (or a line
-  per tick for `monitor`). Human-readable errors go to **stderr**.
-- **Exit codes:** `0` success, `1` operational error, `2` usage error, `3` `apply` skipped by the boot-loop
-  guard (see below).
+- **Transport:** one process per command. Every command prints **one JSON object to stdout**, or a
+  line per tick for the streaming commands. Errors are JSON on stdout too
+  (`{"ok":false,"error":"...","code":<exit-code>}`); **stderr is reserved for debug traces and is
+  normally empty**. Callers should parse one shape regardless of success or failure.
+- **Exit codes:** `0` success, `1` operational error, `2` usage error, `3` `apply` skipped by the
+  boot-loop guard (see below).
+- **Schema handshake:** `tree` and `info` carry `"schema": <N>` and `kmgr version` reports it
+  explicitly. A UI ships an expected value and warns when the binary's differs (a module update
+  replaced the binary without the UI being refreshed, or vice versa).
 
 ## 1. Conventions
 
 - All writes are validated: the path is resolved with `realpath` and must live under one of the allowed
   roots `/sys`, `/proc/sys`, `/dev/cpuset`, `/dev/stune`, `/dev/cpuctl`; path traversal is rejected.
+  The **resolved** path is then opened with `O_NOFOLLOW`, so a symlink swapped in between the check and
+  the write is rejected rather than followed (there is no TOCTOU window between validating one string and
+  writing another).
+- `/sys` is a very wide root, so the allowlist is not a safety boundary. Entries that can destabilise the
+  device carry a `risk` of `medium` or `high`; the UI confirms `high` before applying.
 - A write is followed by a read-back and reports the **actual** value, so callers can detect clamping:
   `{"ok": bool, "requested": string, "actual": string[, "error": string]}`.
 - When the process runs as root, nodes are treated as writable even if their mode is `0444` (many
   `/proc/sys` nodes), matching what root can actually write.
+- Values are **strings** in both directions (raw kernel text), including numeric tunables; the numeric
+  registry hints (`min`, `max`, `step`, `scale`) are integers. `persist` records the current value string
+  verbatim.
 - Identifiers are **keys** of the form `<scope>.<id>` (e.g. `cpu.cluster.policy0.max_freq`). Persisted
   state is keyed by that string, never by the raw path, so it survives kernel updates. Submenu/custom
   children are keyed by their **absolute path** instead.
+- **First-seen defaults** (`defaults.json`) are recorded the first time a key is observed *before* it can
+  change: on the first successful read (`tree`/`get`/`get-many`) **or** immediately before the first write
+  that could change it (`set`/`set-path`/`set-many`/`apply`), whichever happens first. `reset` can only
+  restore the true pre-change value if this invariant holds, so a write never records the value it is
+  about to set as the default.
 
 ## 2. Commands
 
-### `kmgr tree`
+### `kmgr tree [--values]`
 
-Resolves the whole registry and prints it. This is the discovery call a UI makes first.
+Resolves the whole registry and prints it. This is the discovery call a UI makes first. The root
+carries `"ok":true` and `"schema":N`.
 
 ```json
 {
+  "ok": true,
+  "schema": 2,
   "groups": [
     {
       "id": "cpu",
@@ -46,6 +68,13 @@ Resolves the whole registry and prints it. This is the discovery call a UI makes
 }
 ```
 
+`tree --values` skips labels/choices/paths and prints only a key→value map, which is far cheaper for a
+periodic refresh:
+
+```json
+{"ok":true,"schema":2,"values":{"cpu.cluster.policy0.governor":"schedutil","cpu.cluster.policy0.max_freq":"1804800"}}
+```
+
 **Entry**
 
 | field | type | meaning |
@@ -61,7 +90,8 @@ Resolves the whole registry and prints it. This is the discovery call a UI makes
 | `choices` | `[{value,label}]` | selectable options (enums, freq lists) |
 | `labels` | `{value:label}` | value→text map (booleans) |
 | `min,max,step` | int\|null | numeric hints |
-| `unit,display_unit,scale` | string/int\|null | raw unit, display unit, and display divisor |
+| `unit,display_unit` | string\|null | raw unit and display unit |
+| `scale` | int\|null | display divisor (absent = 1) |
 | `write_order` | string\|null | paired-freq write ordering hint |
 | `handler` | string\|null | native handler (`zram`, `wm_size`, `wm_density`, `custom_tunables`) |
 | `bundle` | string\|null | entries applied together (e.g. `zram`, `kcal`) |
@@ -83,6 +113,16 @@ Entries whose node is missing on the kernel are silently omitted, as is a group/
  "type":"enum","path":"/sys/.../scaling_governor","value":"schedutil","persisted":false}
 ```
 
+### `kmgr get-many <key>...`
+
+Resolves many keys in one process and prints only `key→value` (or `null` when a key does not resolve on
+this kernel). Absolute paths are accepted for custom/submenu children. This is the cheap refresh path
+when the UI already has the tree shape.
+
+```json
+{"ok":true,"schema":2,"values":{"cpu.cluster.policy0.governor":"schedutil","cpu.cluster.policy0.max_freq":"1804800"}}
+```
+
 ### `kmgr set <key> <value> [--persist]`
 
 Applies live; `--persist` also records it as set-on-boot. Handler entries (e.g. `zram`) run their native
@@ -91,6 +131,14 @@ sequence instead of a plain write.
 ```json
 {"ok":true,"requested":"performance","actual":"performance","key":"cpu.cluster.policy0.governor","persisted":true}
 ```
+
+### `kmgr set-many <key> <value> ... [--persist]`
+
+Applies several plain nodes as **one atomic unit** (e.g. a KCAL RGB bundle). Each pair is written and
+read back in order; if any write fails or is clamped, the already-written nodes are restored to their
+previous values and the call returns `{"ok":false,"rolled_back":true,"failed":{...},"applied":[...]}`.
+On success it returns `{"ok":true,"applied":[...]}`. Handler entries are not accepted here — use `set`
+for those.
 
 ### `kmgr persist <key>` / `kmgr unpersist <key>`
 
@@ -117,31 +165,49 @@ the allowed roots and existence.
 
 Re-applies every persisted entry once. Intended for boot.
 
+- **Order:** entries are replayed in **registry order** (groups → sections → entries as authored), never
+  in `applied.conf` file order. Keys that no longer resolve (and absolute paths) are replayed last in
+  stable key order. This guarantees paired min/max frequency nodes are written in the same order the UI
+  writes them, so a boot cannot fail by writing `min` above the current `max` (or vice versa).
 - Boot-loop guard: if `boot_count >= 2`, prints `{"ok":false,"skipped":true,"reason":"..."}` and exits `3`.
 - Otherwise prints `{"ok":bool,"applied":[{"key":... ,"ok":... ,"requested":... ,"actual":... [,"error":...]}]}`.
+- `apply` does **not** clear `boot_count`. The boot script clears it only after the device has stayed up
+  past a settle window (`sys.boot_completed` + a delay), so settings that crash the device shortly after
+  a "successful" apply still trip the guard on the next boot.
 
 ### `kmgr reset <scope|all>`
 
-Restores the first-seen defaults (from `defaults.json`) for the scope and clears its persisted entries.
+Restores the first-seen defaults (from `defaults.json`, recorded as described in §1) for the scope and
+clears its persisted entries.
 
 ```json
 {"ok":true,"scope":"display.kcal","restored":[{"key":"display.kcal.red","ok":true,"requested":"256","actual":"256"}]}
+```
+
+### `kmgr version`
+
+Handshake for a UI that shipped an expected schema. One-shot, no side effects.
+
+```json
+{"ok":true,"name":"kmgr","version":"0.1.0","schema":2}
 ```
 
 ### `kmgr monitor --interval <ms> [--seconds N]`
 
 Streams one JSON object per line (NDJSON) to stdout, one per tick. Source files are opened once and
 re-read each tick (no per-tick fork). `--seconds N` makes it exit on its own (leak guard); the stream also
-ends cleanly when the reader closes the pipe.
+ends cleanly when the reader closes the pipe. `monitor` is the dashboard composite and overlaps the
+`live` tabs (e.g. its CPU/GPU/RAM fields mirror `live cpu`/`live gpu`/`live ram`); use `live` when only
+one tab is on screen.
 
 ```json
 {
   "t": 1791171328917,
   "load": 1.7,
-  "cores": [{"cpu":0,"cur":1171200,"min":1171200,"max":1804800,"load":0.0}],
-  "clusters": [{"title":"Little cluster","governor":"schedutil","cur":1171200,"max":1804800}],
+  "cores": [{"cpu":0,"cur_khz":1171200,"min_khz":1171200,"max_khz":1804800,"load":0.0}],
+  "clusters": [{"title":"Little cluster","governor":"schedutil","cur_khz":1171200,"max_khz":1804800}],
   "cpu_temp": 37.6,
-  "gpu": {"busy":25.0,"cur":150000000,"max":670000000},
+  "gpu": {"busy":25.0,"cur_hz":150000000,"max_hz":670000000},
   "mem": {"total":5628.2,"free":121.1,"available":1405.5,"cached":1448.4},
   "zram": {"total":3072.0,"used":2152.3,"compr":736.7,"pct":70.1},
   "battery": {"capacity":54,"status":"Charging","temp":34.0,"current":-230468,"voltage":3908681,
@@ -156,9 +222,11 @@ ends cleanly when the reader closes the pipe.
 }
 ```
 
-Units: frequencies are Hz (CPU is kHz on some nodes → the registry `scale` normalises display), memory in
-MiB, temperature °C, battery current µA, voltage µV, charge µAh. Any field may be `null` when its source
-is unavailable. `deep_sleep_ms` = (wall clock − `btime`) − `/proc/uptime`.
+Units are carried in the field names, so no scaling guesswork is needed: CPU frequencies are
+`*_khz`, GPU/DDR frequencies are `*_hz` (mirroring the live tabs' `khz`/`cur_hz`), memory is MiB,
+temperature °C, battery current µA, voltage µV, charge µAh, `deep_sleep_ms` ms and `uptime` s. Any field
+may be `null` when its source is unavailable — never a fake `0`. Deep sleep prefers the kernel's
+`/sys/power/suspend_stats/total_time`, falling back to `CLOCK_BOOTTIME − CLOCK_MONOTONIC`.
 
 ### `kmgr live list`
 
@@ -285,22 +353,24 @@ App-side UI settings (accent colour, refresh intervals, list sizes, …) stored 
 
 ## 4. Registry schema
 
-The registry that `tree` resolves is authored as JSON in `tunables.d/` and compiled into the binary. Its
-field reference lives in `tunables.d/_schema.md` (groups → sections → entries, `foreach`, `locate`,
-`auto_glob`, `handler`, `bundle`, `write_order`, `verify`, `optional`, `help`, `risk`).
+The registry that `tree` resolves is authored as JSON in `tunables.d/` and compiled into the binary. The
+full field reference is reproduced in Appendix A (`tunables.d/_schema.md` is the authoring copy).
 
 ## 5. State files (`/data/adb/kmgr/`)
 
 | file | format |
 |---|---|
 | `applied.conf` | `key=value` lines; `key` is `scope.id` or an absolute path |
-| `defaults.json` | `{"key":"first-seen-value"}` |
+| `defaults.json` | `{"key":"first-seen-value"}`; recorded as described in §1 |
 | `custom.json` | `{"tunables":["/abs/path", ...]}` |
 | `settings.json` | `{"key":"value"}`; app-side UI settings (`kmgr settings`) |
 | `hold_thermal` | presence = thermal hold enabled |
-| `boot_count` | integer, incremented by `post-fs-data.sh`, cleared by a successful apply |
+| `boot_count` | integer, incremented by `post-fs-data.sh`; cleared by `service.sh` only after a settle window |
 | `boot_failed` | presence = saved settings were skipped by the boot-loop guard |
 | `logs/discover.log` | unresolved `verify` entries, one per line |
+
+Every JSON/conf state file is rewritten whole, so it is **written to a temp file and renamed into place**.
+A concurrent reader (`set --persist` while `apply` runs) therefore never observes a half-written file.
 
 These are written by the app only; end users never edit them.
 
@@ -309,10 +379,71 @@ These are written by the app only; end users never edit them.
 The manager injects a global `ksu` (`WebViewInterface.addJavascriptInterface(..., "ksu")`). The official
 `kernelsu` npm library wraps it:
 
-- `exec(cmd) -> Promise<{errno, stdout, stderr}>` for one-shots.
-- `spawn(cmd, args, options) -> ChildProcess`; listen with `child.stdout.on('data', ...)`,
-  `child.on('exit', ...)`. **There is no kill** — terminate a long-lived child by tagging its command line
-  and running `pkill -f <tag>`.
+- `exec(cmd) -> Promise<{errno, stdout, stderr}>` runs a **shell string**. Never interpolate a
+  user-supplied value (tunable value, custom path, property value, …) into it — a quote or `;` is
+  shell injection.
+- `spawn(cmd, args, options) -> ChildProcess` runs an **argv array with no shell**. Use it for anything
+  user-supplied, and for streaming commands. Listen with `child.stdout.on('data', ...)`,
+  `child.on('exit', ...)`.
+- **There is no kill.** Terminate a long-lived child by passing a unique tag as an argv entry and running
+  `pkill -f '[t]ag'`. The bracket makes the pkill command line contain `[t]ag` while the regex matches the
+  literal `tag`, so pkill cannot match (and kill) its own shell. A pidfile is an equivalent alternative.
+
+The shipped WebUI wraps this as `kmgr(args)` (string or argv array), `execArgs(cmd, args)`, and
+`spawn(cmd, args, onLine, onExit)` in `src/webui/src/lib/ksu.js`; argv-array calls are used for every
+user-supplied value.
 
 A browser mock (`src/webui/src/lib/mock.js`) returns canned JSON for `tree`/`info`/`set` and emits fake
 `monitor` samples when `window.ksu` is absent, so the UI runs off-device.
+
+## Appendix A — registry schema
+
+Each file in `tunables.d/` is one UI tab/group; files load in filename order. Nothing is a hardcoded
+device assumption: every path is probed at runtime, and entries whose node is missing (or not writable)
+are hidden.
+
+```
+File:    { "group", "title", "sections":[ Section ] }
+Section: { "id", "title", "foreach"?: Foreach, "entries":[ Entry ] }
+
+Foreach (repeat a section per match):
+  { "var":"policy", "glob":"/sys/devices/system/cpu/cpufreq/policy*",
+    "order":"numeric", "titles":["Little cluster","Big cluster","Prime cluster"],
+    "title_fallback":"Cluster {i}" }
+  Placeholders usable in strings: {dir} (matched path), {name} (basename), {i} (rank, 0-based),
+  {cur:<entry id suffix>} (current value of a sibling entry, e.g. {cur:governor}).
+  Titles are assigned by RANK of the sorted matches, never by a fixed policy number.
+
+Entry fields:
+  id          unique within the section scope; persisted as "<scope>.<id>=<value>" in applied.conf
+  label       UI label
+  path        single node path
+  paths       candidate list, first existing wins
+  locate      {"names":[...],"roots":[...],"max_depth":N} search fallback; log misses to discover.log
+  type        int | bool | enum | enum_bracket | enum_int | freq | string | dir | glob_files | auto_glob | rgb | custom
+  labels      value->text map (e.g. {"0":"Disabled","1":"Enabled"})
+  zero_label  text shown when value is 0
+  choices_from node containing a space-separated list of options
+  choices     static options
+  min,max,step   integers (NULL when unset)
+  unit,display_unit strings (NULL when unset)
+  scale       integer display divisor (NULL/absent = 1); divides the raw value for display
+  handler     named native handler in kmgr for multi-step writes
+  bundle      entries sharing a bundle are applied together by the handler (one persisted record)
+  write_order "max_first_when_raising" | "min_first_when_lowering" (paired nodes, interactive sets)
+  verify      true = path/semantics not confirmed; keep behind discovery + read-back check
+  dir         type dir: expandable submenu listing every writable regular file under path
+  glob_files  type glob_files: for each dir matching "glob", expose the listed "files"
+  auto_glob   type auto_glob: expose every writable file matching roots/name_glob that is not
+              already declared; value type inferred (int if numeric, else string)
+  risk        "low" | "medium" | "high"; "high" nodes are confirmed by the UI before applying
+  help        one-line hint
+  optional    true = hide silently if no candidate exists (no discover.log noise)
+  apply       "once" (default) = write at boot only; never re-assert unless hold is enabled
+  never_touch_mode_or_context   true = never chmod/chcon this node, never write it from post-fs-data
+
+Additions
+  enum_int    int-valued enum: "values":[{"value":N,"label":"..."}], "unknown_label":"Unknown ({v})"
+  Files 05-sources.json and 80-features.json use "sources"/"sections" shapes: sources are read-only
+  candidate lists for the monitor; features are ordinary entries.
+```
