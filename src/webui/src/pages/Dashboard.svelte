@@ -79,13 +79,13 @@
       <div class="grid4">
         {#each sample.cores as c (c.cpu)}
           <div class="c">
-            <div class="cur">{mhz(c.cur)}</div>
+            <div class="cur">{mhz(c.cur_khz)}</div>
           </div>
         {/each}
       </div>
       <div class="line"><b>System load:</b> {pct(sample.load)}</div>
       {#each sample.clusters as c (c.title)}
-        <div class="line"><b>{c.title} max freq:</b> {mhz(c.max)}</div>
+        <div class="line"><b>{c.title} max freq:</b> {mhz(c.max_khz)}</div>
       {/each}
       {#if govLine}
         <div class="line"><b>Governor:</b> {govLine}</div>
@@ -94,8 +94,8 @@
 
     <Card label="GPU" icon="zap">
       <div class="line"><b>Usage:</b> {pct(sample.gpu.busy)}</div>
-      <div class="line"><b>Current freq:</b> {hzToMhz(sample.gpu.cur)}</div>
-      <div class="line"><b>Max freq:</b> {hzToMhz(sample.gpu.max)}</div>
+      <div class="line"><b>Current freq:</b> {hzToMhz(sample.gpu.cur_hz)}</div>
+      <div class="line"><b>Max freq:</b> {hzToMhz(sample.gpu.max_hz)}</div>
       {#if info?.gpu}
         <div class="line"><b>Vendor:</b> {info.gpu.vendor || '—'}</div>
         <div class="line"><b>Renderer:</b> {info.gpu.renderer || '—'}</div>

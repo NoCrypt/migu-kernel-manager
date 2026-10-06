@@ -11,16 +11,19 @@ use std::time::Duration;
 const CLOCK_MONOTONIC: i32 = 1;
 const CLOCK_BOOTTIME: i32 = 7;
 
+#[cfg(unix)]
 #[repr(C)]
 struct Timespec {
     tv_sec: i64,
     tv_nsec: i64,
 }
 
+#[cfg(unix)]
 extern "C" {
     fn clock_gettime(clk_id: i32, tp: *mut Timespec) -> i32;
 }
 
+#[cfg(unix)]
 fn clock_secs(clk_id: i32) -> Option<f64> {
     let mut ts = Timespec {
         tv_sec: 0,
@@ -31,6 +34,13 @@ fn clock_secs(clk_id: i32) -> Option<f64> {
     } else {
         None
     }
+}
+
+// Host builds (the off-device smoke test) have no clock_gettime; there deep
+// sleep is unavailable and falls back to suspend statistics.
+#[cfg(not(unix))]
+fn clock_secs(_clk_id: i32) -> Option<f64> {
+    None
 }
 
 // Deep sleep (total suspend time) = CLOCK_BOOTTIME - CLOCK_MONOTONIC, the same
@@ -197,9 +207,9 @@ pub fn run(interval_ms: u64, seconds: Option<u64>) -> i32 {
             };
             cores_json.push(json!({
                 "cpu": c.cpu,
-                "cur": cur.and_then(|v| v.parse::<i64>().ok()),
-                "min": min.and_then(|v| v.parse::<i64>().ok()),
-                "max": max.and_then(|v| v.parse::<i64>().ok()),
+                "cur_khz": cur.and_then(|v| v.parse::<i64>().ok()),
+                "min_khz": min.and_then(|v| v.parse::<i64>().ok()),
+                "max_khz": max.and_then(|v| v.parse::<i64>().ok()),
                 "load": load.map(|v| (v * 10.0).round() / 10.0),
             }));
         }
@@ -210,8 +220,8 @@ pub fn run(interval_ms: u64, seconds: Option<u64>) -> i32 {
                 json!({
                     "title": c.title,
                     "governor": c.governor.read(),
-                    "cur": c.cur.as_mut().and_then(|h| h.read()).and_then(|v| v.parse::<i64>().ok()),
-                    "max": c.max.read().and_then(|v| v.parse::<i64>().ok()),
+                    "cur_khz": c.cur.as_mut().and_then(|h| h.read()).and_then(|v| v.parse::<i64>().ok()),
+                    "max_khz": c.max.read().and_then(|v| v.parse::<i64>().ok()),
                 })
             })
             .collect();
@@ -296,8 +306,8 @@ pub fn run(interval_ms: u64, seconds: Option<u64>) -> i32 {
 
         let gpu = json!({
             "busy": handles.get_mut("gpu_busy").and_then(|h| h.read()).and_then(|v| first_num(&v)),
-            "cur": handles.get_mut("gpu_cur_freq").and_then(|h| h.read()).and_then(|v| v.parse::<i64>().ok()),
-            "max": handles.get_mut("gpu_max_freq").and_then(|h| h.read()).and_then(|v| v.parse::<i64>().ok()),
+            "cur_hz": handles.get_mut("gpu_cur_freq").and_then(|h| h.read()).and_then(|v| v.parse::<i64>().ok()),
+            "max_hz": handles.get_mut("gpu_max_freq").and_then(|h| h.read()).and_then(|v| v.parse::<i64>().ok()),
         });
 
         let loadavg_line = handles.get_mut("loadavg").and_then(|h| h.read());
@@ -313,9 +323,28 @@ pub fn run(interval_ms: u64, seconds: Option<u64>) -> i32 {
             .and_then(|h| h.read())
             .and_then(|v| first_num(&v));
 
-        let (deep_sleep_ms, deep_sleep_pct) = match deep_sleep() {
-            Some((ms, pct)) => (Some(ms), Some(pct)),
-            None => (None, None),
+        // Prefer the kernel's own suspend accounting when it exists; otherwise
+        // derive it from CLOCK_BOOTTIME - CLOCK_MONOTONIC.
+        let suspend_ms = handles
+            .get_mut("suspend_time")
+            .and_then(|h| h.read())
+            .and_then(|v| first_num(&v));
+        let (deep_sleep_ms, deep_sleep_pct) = match suspend_ms {
+            Some(ms) => {
+                let pct = uptime.and_then(|up| {
+                    let total = up * 1000.0 + ms;
+                    if total > 0.0 {
+                        Some((ms / total * 1000.0).round() / 10.0)
+                    } else {
+                        None
+                    }
+                });
+                (Some(ms), pct)
+            }
+            None => match deep_sleep() {
+                Some((ms, pct)) => (Some(ms), Some(pct)),
+                None => (None, None),
+            },
         };
 
         let sample = json!({

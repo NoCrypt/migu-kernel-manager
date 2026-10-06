@@ -214,8 +214,9 @@ function sample(i) {
   const gpuBusy = Math.max(1, Math.min(99, 20 + 30 * Math.sin(i / 3 + 1)));
   const cores = [0, 1, 2, 3, 4, 5, 6, 7].map((c) => ({
     cpu: c,
-    cur: c < 4 ? 1804800 : c < 6 ? 2419200 : 3187200,
-    min: c < 4 ? 300000 : c < 6 ? 710400 : 825600,
+    cur_khz: c < 4 ? 1804800 : c < 6 ? 2419200 : 3187200,
+    min_khz: c < 4 ? 300000 : c < 6 ? 710400 : 825600,
+    max_khz: c < 4 ? 1804800 : c < 6 ? 2419200 : 3187200,
     load: Math.round(Math.max(0, Math.min(100, load + (c - 3.5) * 4)) * 10) / 10
   }));
   return {
@@ -223,12 +224,12 @@ function sample(i) {
     load: Math.round(load * 10) / 10,
     cores,
     clusters: [
-      { title: 'Little cluster', governor: 'schedutil', cur: 1804800, max: 1804800 },
-      { title: 'Big cluster', governor: 'schedutil', cur: 2419200, max: 2419200 },
-      { title: 'Prime cluster', governor: 'schedutil', cur: 3187200, max: 3187200 }
+      { title: 'Little cluster', governor: 'schedutil', cur_khz: 1804800, max_khz: 1804800 },
+      { title: 'Big cluster', governor: 'schedutil', cur_khz: 2419200, max_khz: 2419200 },
+      { title: 'Prime cluster', governor: 'schedutil', cur_khz: 3187200, max_khz: 3187200 }
     ],
     cpu_temp: Math.round((38 + 6 * Math.sin(i / 5)) * 10) / 10,
-    gpu: { busy: Math.round(gpuBusy * 10) / 10, cur: 305000000, max: 670000000 },
+    gpu: { busy: Math.round(gpuBusy * 10) / 10, cur_hz: 305000000, max_hz: 670000000 },
     mem: { total: 5694, free: 1200 + i * 2, available: 3100, cached: 1400 },
     zram: { total: 4096, used: 512, compr: 256, pct: 12.5 },
     battery: {
