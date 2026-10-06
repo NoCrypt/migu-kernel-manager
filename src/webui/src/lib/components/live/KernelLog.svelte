@@ -35,7 +35,13 @@
     if (klog.term && matches.length && viewport) {
       const idx = matches[Math.min(klog.cur, matches.length - 1)];
       const el = viewport.querySelector(`[data-i="${idx}"]`);
-      if (el) el.scrollIntoView({ block: 'center' });
+      viewport.querySelectorAll('.is-active-match').forEach(activeRow => {
+        activeRow.classList.remove('is-active-match');
+      });
+      if (el) {
+        el.scrollIntoView({ block: 'center' });
+        el.querySelector('mark').classList.add('is-active-match');
+      }
     }
   });
 
