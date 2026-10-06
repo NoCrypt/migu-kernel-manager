@@ -11,8 +11,9 @@
   import Props from './pages/Props.svelte';
   import Settings from './pages/Settings.svelte';
   import Placeholder from './lib/components/Placeholder.svelte';
-  import { ui, routeFromHash } from './lib/ui.svelte.js';
+  import { ui, routeFromHash, toast } from './lib/ui.svelte.js';
   import { enableEdgeToEdge } from './lib/ksu.js';
+  import { kmgr, EXPECTED_SCHEMA } from './lib/backend.js';
 
   const titles = {
     dashboard: 'Dashboard',
@@ -30,6 +31,15 @@
     ui.route = routeFromHash();
     const onHash = () => (ui.route = routeFromHash());
     window.addEventListener('hashchange', onHash);
+    // Detect a module binary that was updated without the UI bundle (or vice versa).
+    kmgr('version')
+      .then((raw) => {
+        const v = JSON.parse(raw);
+        if (v && v.schema && v.schema !== EXPECTED_SCHEMA) {
+          toast('kmgr version mismatch — update the module');
+        }
+      })
+      .catch(() => {});
     return () => window.removeEventListener('hashchange', onHash);
   });
 </script>

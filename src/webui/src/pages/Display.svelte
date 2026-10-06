@@ -69,7 +69,13 @@
   }
 
   async function writeKcal(entry, value) {
-    const r = JSON.parse(await kmgr(`set ${entry.key} ${value}${entry.persisted ? ' --persist' : ''}`));
+    const r = JSON.parse(
+      await kmgr(
+        entry.persisted
+          ? ['set', entry.key, String(value), '--persist']
+          : ['set', entry.key, String(value)]
+      )
+    );
     if (!r.ok) {
       toast(r.error ? String(r.error) : 'Rejected');
     } else if (String(r.actual) !== String(value)) {
@@ -79,7 +85,7 @@
   }
 
   async function persistKcal(entry, on) {
-    await kmgr(`${on ? 'persist' : 'unpersist'} ${entry.key}`);
+    await kmgr([on ? 'persist' : 'unpersist', entry.key]);
     entries = entries.map((e) => (e.key === entry.key ? { ...e, persisted: on } : e));
   }
 
@@ -115,7 +121,7 @@
     const kind = picker.kind;
     const prev = wm;
     picker = null;
-    const r = JSON.parse(await kmgr(`wm ${kind === 'size' ? 'size' : 'density'} ${value}`));
+    const r = JSON.parse(await kmgr(['wm', kind === 'size' ? 'size' : 'density', String(value)]));
     if (!r.ok) {
       toast(r.error ? String(r.error) : 'Failed');
       return;
@@ -128,8 +134,8 @@
     const label = kind === 'size' ? 'resolution' : 'density';
     const prevVal = kind === 'size' ? prev?.size?.override || null : prev?.density?.override || null;
     const doRevert = async () => {
-      if (prevVal) await kmgr(`wm ${kind === 'size' ? 'size' : 'density'} ${prevVal}`);
-      else await kmgr(`wm ${kind === 'size' ? 'size' : 'density'} reset`);
+      if (prevVal) await kmgr(['wm', kind === 'size' ? 'size' : 'density', String(prevVal)]);
+      else await kmgr(['wm', kind === 'size' ? 'size' : 'density', 'reset']);
       await loadWm();
       toast(`Reverted ${label}`);
     };

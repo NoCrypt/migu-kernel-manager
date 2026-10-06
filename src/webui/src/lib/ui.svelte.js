@@ -59,7 +59,7 @@ export async function loadSettings() {
 
 function persist(key, value) {
   const v = String(value).replace(/[^0-9a-zA-Z#_.-]/g, '');
-  kmgr(`settings set ${key} '${v}'`).catch(() => {});
+  kmgr(['settings', 'set', key, v]).catch(() => {});
 }
 
 export function setShowHelp(v) {

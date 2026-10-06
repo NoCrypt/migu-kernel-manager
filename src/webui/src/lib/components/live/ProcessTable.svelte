@@ -68,7 +68,7 @@
     target = null;
     if (!p) return;
     try {
-      const r = JSON.parse(await kmgr(`kill ${p.pid}`));
+      const r = JSON.parse(await kmgr(['kill', String(p.pid)]));
       if (r.ok) toast(`Killed ${r.name || p.name} (${p.pid})`);
       else toast(r.error ? String(r.error) : 'Kill failed');
     } catch {

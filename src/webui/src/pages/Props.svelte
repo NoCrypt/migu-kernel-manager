@@ -13,7 +13,7 @@
 
   async function load(q = query) {
     try {
-      const r = JSON.parse(await kmgr(`props list ${q}`.trim()));
+      const r = JSON.parse(await kmgr(['props', 'list', q]));
       props = r.props || [];
       total = r.total || 0;
     } catch {
@@ -33,7 +33,7 @@
 
   async function toggle(item, on) {
     const r = JSON.parse(
-      await kmgr(on ? `props set '${item.key}' '${item.value}'` : `props unset '${item.key}'`)
+      await kmgr(on ? ['props', 'set', item.key, item.value] : ['props', 'unset', item.key])
     );
     if (r.ok) {
       props = props.map((p) => (p.key === item.key ? { ...p, overridden: on } : p));
@@ -49,7 +49,7 @@
       toast('Enter a key');
       return;
     }
-    const r = JSON.parse(await kmgr(`props set '${key}' '${value}'`));
+    const r = JSON.parse(await kmgr(['props', 'set', key, value]));
     if (r.ok) {
       editor = null;
       toast('Saved · reboot required');

@@ -2,7 +2,7 @@
 // NDJSON on stdout; the child self-terminates after LIFETIME seconds and the
 // UI restarts it, so a leaked child can never outlive the watchdog.
 import { spawn, exec, hasKsu } from './ksu.js';
-import { KMGR } from './backend.js';
+import { KMGR, pkillPattern } from './backend.js';
 
 let counter = 0;
 const LIFETIME = 30;
@@ -15,8 +15,10 @@ export function startStream(args, onLine, onGone) {
   function launch() {
     if (stopped) return;
     tag = `kmgr-live-${(counter++).toString(36)}-${Date.now().toString(36)}`;
+    const argv = [...String(args).split(/\s+/).filter(Boolean), '--seconds', String(LIFETIME), tag];
     child = spawn(
-      `${KMGR} ${args} --seconds ${LIFETIME} ${tag}`,
+      KMGR,
+      argv,
       (line) => {
         let obj;
         try {
@@ -46,7 +48,7 @@ export function startStream(args, onLine, onGone) {
     } catch {
       /* ignore */
     }
-    if (hasKsu()) exec(`pkill -f ${t}`).catch(() => {});
+    if (hasKsu()) exec(`pkill -f '${pkillPattern(t)}'`).catch(() => {});
   };
 }
 

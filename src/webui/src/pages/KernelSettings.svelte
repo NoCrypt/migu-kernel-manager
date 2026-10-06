@@ -81,8 +81,14 @@
     const run = async () => {
       const r =
         kind === 'path' || entry.isChild
-          ? JSON.parse(await kmgr(`set-path '${entry.path || entry.key}' '${value}'`))
-          : JSON.parse(await kmgr(`set ${entry.key} ${value}${entry.persisted ? ' --persist' : ''}`));
+          ? JSON.parse(await kmgr(['set-path', entry.path || entry.key, String(value)]))
+          : JSON.parse(
+              await kmgr(
+                entry.persisted
+                  ? ['set', entry.key, String(value), '--persist']
+                  : ['set', entry.key, String(value)]
+              )
+            );
       if (r.ok) {
         const actual = r.actual && typeof r.actual === 'object' ? null : r.actual;
         if (actual && String(actual) !== String(value)) toast(`Clamped to ${actual}`);
@@ -109,24 +115,24 @@
   }
 
   async function persist(entry, on) {
-    await kmgr(`${on ? 'persist' : 'unpersist'} ${entry.key}`);
+    await kmgr([on ? 'persist' : 'unpersist', entry.key]);
     await load();
   }
 
   async function persistPath(path, on) {
-    await kmgr(`${on ? 'persist-path' : 'unpersist-path'} '${path}'`);
+    await kmgr([on ? 'persist-path' : 'unpersist-path', path]);
     await load();
   }
 
   async function toggleHold(on) {
     hold = on;
-    await kmgr(`thermal-hold ${on ? 'on' : 'off'}`);
-    if (on) spawn(`${KMGR} hold-thermal --interval 10000`, () => {});
-    else exec('pkill -f hold-thermal').catch(() => {});
+    await kmgr(['thermal-hold', on ? 'on' : 'off']);
+    if (on) spawn(KMGR, ['hold-thermal', '--interval', '10000'], () => {});
+    else exec("pkill -f '[h]old-thermal'").catch(() => {});
   }
 
   async function addCustom() {
-    const r = JSON.parse(await kmgr(`custom add '${addPath.trim()}'`));
+    const r = JSON.parse(await kmgr(['custom', 'add', addPath.trim()]));
     if (r.ok) {
       addOpen = false;
       addPath = '';
@@ -138,7 +144,7 @@
   }
 
   async function removeCustom(path) {
-    await kmgr(`custom remove '${path}'`);
+    await kmgr(['custom', 'remove', path]);
     await load();
   }
 </script>

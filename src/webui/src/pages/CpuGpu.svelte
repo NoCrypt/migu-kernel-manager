@@ -49,8 +49,14 @@
     const run = async () => {
       const r =
         entry.isChild
-          ? JSON.parse(await kmgr(`set-path '${entry.path || entry.key}' '${value}'`))
-          : JSON.parse(await kmgr(`set ${entry.key} ${value}${entry.persisted ? ' --persist' : ''}`));
+          ? JSON.parse(await kmgr(['set-path', entry.path || entry.key, String(value)]))
+          : JSON.parse(
+              await kmgr(
+                entry.persisted
+                  ? ['set', entry.key, String(value), '--persist']
+                  : ['set', entry.key, String(value)]
+              )
+            );
       if (r.ok) {
         const actual = r.actual && typeof r.actual === 'object' ? null : r.actual;
         if (actual && String(actual) !== String(value)) toast(`Clamped to ${actual}`);
@@ -77,12 +83,12 @@
   }
 
   async function persist(entry, on) {
-    await kmgr(`${on ? 'persist' : 'unpersist'} ${entry.key}`);
+    await kmgr([on ? 'persist' : 'unpersist', entry.key]);
     await load();
   }
 
   async function persistPath(path, on) {
-    await kmgr(`${on ? 'persist-path' : 'unpersist-path'} '${path}'`);
+    await kmgr([on ? 'persist-path' : 'unpersist-path', path]);
     await load();
   }
 </script>
