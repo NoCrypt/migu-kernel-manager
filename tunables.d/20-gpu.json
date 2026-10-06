@@ -1,0 +1,160 @@
+{
+  "group": "gpu",
+  "title": "GPU",
+  "sections": [
+    {
+      "id": "kgsl",
+      "title": "GPU control",
+      "foreach": {
+        "var": "gpu",
+        "glob": "/sys/class/kgsl/kgsl-3d0",
+        "order": "numeric",
+        "titles": [
+          "Adreno"
+        ],
+        "title_fallback": "GPU {i}"
+      },
+      "entries": [
+        {
+          "id": "max_freq",
+          "label": "Maximum GPU frequency",
+          "paths": [
+            "{dir}/devfreq/max_freq"
+          ],
+          "type": "freq",
+          "choices_from": "{dir}/devfreq/available_frequencies",
+          "unit": "Hz",
+          "display_unit": "MHz",
+          "scale": 1000000,
+          "write_order": "max_first_when_raising",
+          "help": "Highest frequency the GPU may use. Lower it to save power or raise it for smoother graphics.",
+          "risk": "low"
+        },
+        {
+          "id": "min_freq",
+          "label": "Minimum GPU frequency",
+          "paths": [
+            "{dir}/devfreq/min_freq"
+          ],
+          "type": "freq",
+          "choices_from": "{dir}/devfreq/available_frequencies",
+          "unit": "Hz",
+          "display_unit": "MHz",
+          "scale": 1000000,
+          "write_order": "min_first_when_lowering",
+          "help": "Lowest frequency the GPU may drop to. A high floor costs battery.",
+          "risk": "low"
+        },
+        {
+          "id": "governor",
+          "label": "GPU governor",
+          "path": "{dir}/devfreq/governor",
+          "type": "enum",
+          "choices_from": "{dir}/devfreq/available_governors",
+          "help": "The policy that decides how the GPU scales between its frequencies.",
+          "risk": "low"
+        },
+        {
+          "id": "max_pwrlevel",
+          "label": "Max power level",
+          "path": "{dir}/max_pwrlevel",
+          "type": "int",
+          "min": 0,
+          "help": "Highest allowed power level. Lower numbers mean higher clocks and more heat.",
+          "risk": "medium"
+        },
+        {
+          "id": "min_pwrlevel",
+          "label": "Min power level",
+          "path": "{dir}/min_pwrlevel",
+          "type": "int",
+          "min": 0,
+          "help": "Lowest allowed power level; acts as a frequency floor. Too low can cause glitches.",
+          "risk": "high"
+        },
+        {
+          "id": "default_pwrlevel",
+          "label": "Default power level",
+          "path": "{dir}/default_pwrlevel",
+          "type": "int",
+          "min": 0,
+          "help": "Power level the GPU starts at before the governor takes over.",
+          "risk": "low"
+        },
+        {
+          "id": "idle_timer",
+          "label": "Idle timer (ms)",
+          "path": "{dir}/idle_timer",
+          "type": "int",
+          "min": 0,
+          "help": "How long the GPU stays awake after going idle, in milliseconds.",
+          "risk": "low"
+        },
+        {
+          "id": "throttling",
+          "label": "Thermal throttling",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "paths": [
+            "{dir}/throttling",
+            "{dir}/devfreq/throttling",
+            "/sys/kernel/gpu/gpu_throttling"
+          ],
+          "help": "Let the GPU reduce its clocks when it gets hot. Disabling it risks overheating.",
+          "risk": "medium"
+        },
+        {
+          "id": "force_clk_on",
+          "label": "Force clocks on",
+          "path": "{dir}/force_clk_on",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "help": "Keep the GPU clock running instead of gating it when idle. Uses more power.",
+          "risk": "medium"
+        },
+        {
+          "id": "force_bus_on",
+          "label": "Force bus on",
+          "path": "{dir}/force_bus_on",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "help": "Keep the GPU bus on when idle. Uses more power.",
+          "risk": "medium"
+        },
+        {
+          "id": "force_rail_on",
+          "label": "Force rail on",
+          "path": "{dir}/force_rail_on",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "help": "Keep the GPU power rail on when idle. Uses more power.",
+          "risk": "medium"
+        },
+        {
+          "id": "force_no_nap",
+          "label": "Force no nap",
+          "path": "{dir}/force_no_nap",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "help": "Stop the GPU from entering its low-power nap state. Uses more power.",
+          "risk": "medium"
+        }
+      ]
+    }
+  ]
+}

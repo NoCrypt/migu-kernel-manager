@@ -1,0 +1,39 @@
+{
+  "group": "io",
+  "title": "I/O",
+  "sections": [
+    {
+      "id": "blk",
+      "foreach": { "var": "dev", "glob": "/sys/block/sd[a-z]", "order": "alpha",
+                   "titles": [], "title_fallback": "{name}" },
+      "entries": [
+        { "id": "scheduler", "label": "I/O scheduler", "path": "{dir}/queue/scheduler", "type": "enum_bracket",
+          "help": "The algorithm that orders disk requests. mq-deadline is a safe default.",
+          "risk": "low" },
+        { "id": "iosched_tunables", "label": "Tunables", "path": "{dir}/queue/iosched", "type": "dir",
+          "help": "Advanced options for the selected I/O scheduler.",
+          "risk": "medium" },
+        { "id": "read_ahead_kb", "label": "read_ahead_kb", "path": "{dir}/queue/read_ahead_kb", "type": "int", "min": 0,
+          "help": "How far ahead the kernel reads from storage. Larger can help sequential reads.",
+          "risk": "low" },
+        { "id": "nr_requests", "label": "nr_requests", "path": "{dir}/queue/nr_requests", "type": "int", "min": 4,
+          "help": "How many requests can be queued for this device at once.",
+          "risk": "low" },
+        { "id": "rq_affinity", "label": "rq_affinity", "path": "{dir}/queue/rq_affinity", "type": "int", "min": 0, "max": 2,
+          "help": "Assigns I/O completion to the CPU that issued the request, improving cache locality.",
+          "risk": "low" },
+        { "id": "nomerges", "label": "nomerges", "path": "{dir}/queue/nomerges", "type": "int", "min": 0, "max": 2,
+          "help": "Controls whether the kernel merges adjacent disk requests.",
+          "risk": "low" },
+        { "id": "iostats", "label": "iostats", "path": "{dir}/queue/iostats", "type": "bool",
+          "labels": { "0": "Disabled", "1": "Enabled" },
+          "help": "Collect per-device I/O statistics. Disabling saves a little CPU.",
+          "risk": "low" },
+        { "id": "add_random", "label": "add_random", "path": "{dir}/queue/add_random", "type": "bool",
+          "labels": { "0": "Disabled", "1": "Enabled" },
+          "help": "Add disk timing to the kernel entropy pool. Disabling is usually fine on flash storage.",
+          "risk": "low" }
+      ]
+    }
+  ]
+}

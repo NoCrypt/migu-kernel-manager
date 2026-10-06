@@ -1,0 +1,27 @@
+{
+  "group": "scheduler",
+  "title": "Scheduler",
+  "sections": [
+    {
+      "id": "sched",
+      "title": "Scheduler tunables",
+      "entries": [
+        { "id": "sched_energy_aware", "label": "sched_energy_aware", "path": "/proc/sys/kernel/sched_energy_aware",
+          "type": "bool", "labels": { "0": "Disabled", "1": "Enabled" },
+          "help": "Let the scheduler use the CPU energy model to place tasks. Usually best left on.",
+          "risk": "medium" },
+        { "id": "named", "label": "Kernel-specific scheduler nodes", "type": "auto_glob",
+          "ensure_names": ["sched_boost_hr_big", "sched_boost_hr_lp", "sched_boost_hr_prime",
+                           "sched_busy_hyst_ns", "sched_busy_hysteresis_enable_cpus",
+                           "sched_group_downmigrate", "sched_group_upmigrate",
+                           "sched_hr_limit_level", "sched_hr_scaling"],
+          "roots": ["/proc/sys/kernel", "/sys/kernel", "/sys/module", "/sys/devices/system/cpu"],
+          "name_glob": "sched_*", "max_depth": 3, "skip_declared": true, "zero_label": "Disabled",
+          "verify": true,
+          "help": "Scheduler migration thresholds and boosts exposed by this kernel. Wrong values can hurt smoothness.",
+          "risk": "high",
+          "note": "Resolve with locate, show each at its real path, and write any name that is not found to /data/adb/kmgr/logs/discover.log." }
+      ]
+    }
+  ]
+}

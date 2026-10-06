@@ -1,0 +1,54 @@
+{
+  "group": "display",
+  "title": "Display control",
+  "sections": [
+    {
+      "id": "kcal",
+      "title": "Color calibration",
+      "entries": [
+        { "id": "red", "label": "Red", "type": "int", "min": 0, "max": 256, "default": 256,
+          "paths": ["/sys/module/msm_drm/parameters/kcal_red"],
+          "locate": { "names": ["kcal_red"], "roots": ["/sys/module", "/sys/devices/platform"], "max_depth": 3 },
+          "bundle": "kcal", "help": "Red channel gain. 256 is neutral.", "risk": "low" },
+        { "id": "green", "label": "Green", "type": "int", "min": 0, "max": 256, "default": 256,
+          "paths": ["/sys/module/msm_drm/parameters/kcal_green"],
+          "locate": { "names": ["kcal_green"], "roots": ["/sys/module", "/sys/devices/platform"], "max_depth": 3 },
+          "bundle": "kcal", "help": "Green channel gain. 256 is neutral.", "risk": "low" },
+        { "id": "blue", "label": "Blue", "type": "int", "min": 0, "max": 256, "default": 256,
+          "paths": ["/sys/module/msm_drm/parameters/kcal_blue"],
+          "locate": { "names": ["kcal_blue"], "roots": ["/sys/module", "/sys/devices/platform"], "max_depth": 3 },
+          "bundle": "kcal", "help": "Blue channel gain. 256 is neutral.", "risk": "low" },
+        { "id": "sat", "label": "Saturation", "type": "int", "min": 128, "max": 383, "default": 255,
+          "paths": ["/sys/module/msm_drm/parameters/kcal_sat"],
+          "locate": { "names": ["kcal_sat"], "roots": ["/sys/module", "/sys/devices/platform"], "max_depth": 3 },
+          "bundle": "kcal", "help": "Colour saturation. 255 is neutral.", "risk": "low" },
+        { "id": "val", "label": "Value", "type": "int", "min": 128, "max": 383, "default": 255,
+          "paths": ["/sys/module/msm_drm/parameters/kcal_val"],
+          "locate": { "names": ["kcal_val"], "roots": ["/sys/module", "/sys/devices/platform"], "max_depth": 3 },
+          "bundle": "kcal", "help": "Brightness value. 255 is neutral.", "risk": "low" },
+        { "id": "cont", "label": "Contrast", "type": "int", "min": 128, "max": 383, "default": 255,
+          "paths": ["/sys/module/msm_drm/parameters/kcal_cont"],
+          "locate": { "names": ["kcal_cont"], "roots": ["/sys/module", "/sys/devices/platform"], "max_depth": 3 },
+          "bundle": "kcal", "help": "Contrast. 255 is neutral.", "risk": "low" },
+        { "id": "hue", "label": "Hue", "type": "int", "min": 0, "max": 1536, "default": 0,
+          "paths": ["/sys/module/msm_drm/parameters/kcal_hue"],
+          "locate": { "names": ["kcal_hue"], "roots": ["/sys/module", "/sys/devices/platform"], "max_depth": 3 },
+          "bundle": "kcal", "help": "Hue rotation. 0 is neutral.", "risk": "low" }
+      ]
+    },
+    {
+      "id": "display",
+      "title": "Display settings",
+      "entries": [
+        { "id": "resolution", "label": "Display resolution", "type": "custom", "handler": "wm_size",
+          "help": "Override the screen resolution with wm. Reverts after 15s unless you confirm.",
+          "risk": "medium",
+          "note": "Read: wm size. Write: wm size WxH. Always keep a 'Reset display settings' action (wm size reset; wm density reset). Apply with a 15s auto-revert confirm." },
+        { "id": "density", "label": "Display pixel density", "type": "custom", "handler": "wm_density",
+          "help": "Override the pixel density with wm. Reverts after 15s unless you confirm.",
+          "risk": "medium",
+          "note": "Read: wm density. Write: wm density N. Same auto-revert confirm." }
+      ]
+    }
+  ]
+}

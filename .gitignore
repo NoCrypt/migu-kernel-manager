@@ -1,0 +1,24 @@
+# Rust
+target/
+
+# Built module payload
+/out/
+/kmgr/bin/
+/kmgr/webroot/
+
+*.zip
+
+# WebUI
+node_modules/
+/src/webui/dist/
+.svelte-kit/
+
+# Internal docs
+/private_docs/
+
+# Misc
+.env*
+.DS_Store
+*.log
+.idea/
+.vscode/

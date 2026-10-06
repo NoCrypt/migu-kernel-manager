@@ -1,0 +1,7 @@
+# Keep line endings LF so shell scripts stay valid on Android.
+* text=auto eol=lf
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.zip binary

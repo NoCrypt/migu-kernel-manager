@@ -1,0 +1,66 @@
+{
+  "group": "cpu",
+  "title": "CPU",
+  "sections": [
+    {
+      "id": "cluster",
+      "foreach": {
+        "var": "policy",
+        "glob": "/sys/devices/system/cpu/cpufreq/policy*",
+        "order": "numeric",
+        "titles": ["Little cluster", "Big cluster", "Prime cluster"],
+        "title_fallback": "Cluster {i}"
+      },
+      "entries": [
+        { "id": "max_freq", "label": "Maximum CPU frequency", "path": "{dir}/scaling_max_freq",
+          "type": "freq", "choices_from": "{dir}/scaling_available_frequencies",
+          "unit": "kHz", "display_unit": "MHz", "scale": 1000, "write_order": "max_first_when_raising",
+          "help": "Highest frequency this cluster may use. Lower it to save power or raise it for more speed.",
+          "risk": "low" },
+        { "id": "min_freq", "label": "Minimum CPU frequency", "path": "{dir}/scaling_min_freq",
+          "type": "freq", "choices_from": "{dir}/scaling_available_frequencies",
+          "unit": "kHz", "display_unit": "MHz", "scale": 1000, "write_order": "min_first_when_lowering",
+          "help": "Lowest frequency this cluster may drop to. Raising it can feel snappier but drains battery.",
+          "risk": "low" },
+        { "id": "governor", "label": "CPU governor", "path": "{dir}/scaling_governor",
+          "type": "enum", "choices_from": "{dir}/scaling_available_governors",
+          "help": "The policy that decides how this cluster scales between its frequencies.",
+          "risk": "low" },
+        { "id": "governor_params", "label": "Governor parameters", "path": "{dir}/{cur:governor}",
+          "type": "dir",
+          "help": "Advanced tunables for the currently selected governor.",
+          "risk": "medium" }
+      ]
+    },
+    {
+      "id": "misc",
+      "title": "",
+      "entries": [
+        { "id": "core_control", "label": "Core control", "type": "glob_files",
+          "glob": "/sys/devices/system/cpu/cpu*/core_ctl",
+          "files": ["enable", "min_cpus", "max_cpus", "busy_up_thres", "busy_down_thres",
+                    "offline_delay_ms", "task_thres", "nr_prev_assist_thresh", "not_preferred",
+                    "boost", "is_big_cluster", "need_cpus", "global_state"],
+          "help": "Turns individual CPU cores on and off as load changes. Wrong values can hurt performance or stability.",
+          "risk": "high" },
+        { "id": "cpu_online", "label": "CPU online state", "type": "glob_files",
+          "glob": "/sys/devices/system/cpu/cpu[0-9]*", "files": ["online"],
+          "help": "Take individual CPU cores online or offline. Offlining cores changes performance and power.",
+          "risk": "high" },
+        { "id": "cpusets", "label": "Cpusets", "type": "glob_files",
+          "glob": "/dev/cpuset/*", "files": ["cpus"],
+          "help": "Assign groups of processes to run only on chosen CPU cores.",
+          "risk": "medium" },
+        { "id": "stune", "label": "Stune", "type": "glob_files",
+          "glob": "/dev/stune/*", "files": ["schedtune.boost", "schedtune.prefer_idle"],
+          "help": "Scheduler boost per process group. Higher boost favours performance over power.",
+          "risk": "medium" },
+        { "id": "uclamp", "label": "Uclamp", "type": "glob_files",
+          "glob": "/dev/cpuctl/*",
+          "files": ["cpu.uclamp.min", "cpu.uclamp.max", "cpu.uclamp.latency_sensitive"],
+          "help": "Minimum and maximum utilisation hints the scheduler uses for each process group.",
+          "risk": "medium" }
+      ]
+    }
+  ]
+}

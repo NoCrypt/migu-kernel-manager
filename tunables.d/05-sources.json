@@ -1,0 +1,122 @@
+{
+  "group": "sources",
+  "title": "Monitor and info sources (candidate lists, first readable wins)",
+  "sources": {
+    "gpu_busy": [
+      "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+      "/sys/class/kgsl/kgsl-3d0/usage",
+      "/sys/class/devfreq/1c00000.gpu/device/gpu_busy_percentage",
+      "/sys/kernel/gpu/gpu_busy"
+    ],
+    "gpu_cur_freq": [
+      "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq",
+      "/sys/class/kgsl/kgsl-3d0/gpuclk"
+    ],
+    "gpu_max_freq": [
+      "/sys/class/kgsl/kgsl-3d0/devfreq/max_freq",
+      "/sys/class/devfreq/1c00000.gpu/max_freq"
+    ],
+    "gpu_min_freq": [
+      "/sys/class/kgsl/kgsl-3d0/devfreq/min_freq",
+      "/sys/class/devfreq/1c00000.gpu/min_freq"
+    ],
+    "gpu_available_frequencies": [
+      "/sys/class/kgsl/kgsl-3d0/devfreq/available_frequencies",
+      "/sys/class/devfreq/1c00000.gpu/available_frequencies"
+    ],
+    "cpu_temp": [
+      "/sys/class/thermal/thermal_zone0/temp"
+    ],
+    "cpu_stat": [
+      "/proc/stat"
+    ],
+    "loadavg": [
+      "/proc/loadavg"
+    ],
+    "uptime": [
+      "/proc/uptime"
+    ],
+    "suspend_count": [
+      "/sys/power/suspend_stats/success_count",
+      "/sys/power/suspend_stats/success",
+      "/sys/kernel/debug/suspend_stats/success_count"
+    ],
+    "suspend_time": [
+      "/sys/power/suspend_stats/total_time",
+      "/sys/kernel/debug/suspend_stats/total_time"
+    ],
+    "meminfo": [
+      "/proc/meminfo"
+    ],
+    "zram_mm_stat": [
+      "/sys/block/zram0/mm_stat"
+    ],
+    "zram_disksize": [
+      "/sys/block/zram0/disksize"
+    ],
+    "battery_dir": [
+      "/sys/class/power_supply/battery"
+    ],
+    "battery_capacity": [
+      "/sys/class/power_supply/battery/capacity",
+      "/sys/class/power_supply/bms/capacity"
+    ],
+    "battery_status": [
+      "/sys/class/power_supply/battery/status",
+      "/sys/class/power_supply/bms/status"
+    ],
+    "battery_temp": [
+      "/sys/class/power_supply/battery/temp",
+      "/sys/class/power_supply/bms/temp"
+    ],
+    "battery_voltage": [
+      "/sys/class/power_supply/battery/voltage_now",
+      "/sys/class/power_supply/bms/voltage_now",
+      "/sys/class/power_supply/main/voltage_now"
+    ],
+    "battery_current": [
+      "/sys/class/power_supply/battery/current_now",
+      "/sys/class/power_supply/bms/current_now"
+    ],
+    "battery_charge_counter": [
+      "/sys/class/power_supply/battery/charge_counter",
+      "/sys/class/power_supply/bms/charge_counter"
+    ],
+    "battery_charge_full_design": [
+      "/sys/class/power_supply/bms/charge_full_design",
+      "/sys/class/power_supply/battery/charge_full_design",
+      "/sys/class/power_supply/battery/energy_full_design"
+    ],
+    "battery_charge_full": [
+      "/sys/class/power_supply/bms/charge_full",
+      "/sys/class/power_supply/battery/charge_full",
+      "/sys/class/power_supply/battery/energy_full"
+    ],
+    "battery_cycles": [
+      "/sys/class/power_supply/bms/cycle_count",
+      "/sys/class/power_supply/battery/cycle_count",
+      "/sys/class/power_supply/battery/cycle_count_summary"
+    ],
+    "wireguard_version": [
+      "/sys/module/wireguard/version"
+    ],
+    "gpu_model": [
+      "/sys/class/kgsl/kgsl-3d0/gpu_model",
+      "/sys/kernel/gpu/gpu_model"
+    ],
+    "wakeup_sources": [
+      "/sys/kernel/debug/wakeup_sources",
+      "/proc/wakelocks"
+    ],
+    "entropy_avail": [
+      "/proc/sys/kernel/random/entropy_avail"
+    ],
+    "entropy_poolsize": [
+      "/proc/sys/kernel/random/poolsize"
+    ],
+    "kernel_version": [
+      "/proc/version"
+    ]
+  },
+  "note": "Entropy, wireguard and cpu_stat are generic. wakeup_sources usually needs root and debugfs mounted."
+}

@@ -1,0 +1,78 @@
+{
+  "group": "misc",
+  "title": "Miscellaneous",
+  "sections": [
+    {
+      "id": "misc",
+      "entries": [
+        {
+          "id": "tcp_cc",
+          "label": "TCP congestion algorithm",
+          "path": "/proc/sys/net/ipv4/tcp_congestion_control",
+          "type": "enum",
+          "choices_from": "/proc/sys/net/ipv4/tcp_available_congestion_control",
+          "help": "Algorithm that controls how TCP adapts its sending rate. cubic is a safe default.",
+          "risk": "low"
+        },
+        {
+          "id": "thermal_profile",
+          "label": "Thermal profile",
+          "path": "/sys/class/thermal/thermal_message/sconfig",
+          "type": "enum_int",
+          "values": [
+            { "value": 10, "label": "Dynamic" },
+            { "value": 11, "label": "Class 0" },
+            { "value": 15, "label": "AR VR" },
+            { "value": 8, "label": "In-calls" },
+            { "value": 9, "label": "Game" },
+            { "value": 16, "label": "Game 2" },
+            { "value": 2, "label": "Extreme" },
+            { "value": 12, "label": "Pubg" },
+            { "value": 13, "label": "Camera" },
+            { "value": 14, "label": "Youtube" },
+            { "value": 0, "label": "Disabled" }
+          ],
+          "unknown_label": "Unknown ({v})",
+          "apply": "once",
+          "never_touch_mode_or_context": true,
+          "help": "Kernel thermal policy. Applied once at boot; it never locks the node, so other tools still work.",
+          "risk": "medium",
+          "note": "Do NOT chmod/chcon this node and do NOT run from post-fs-data. Write once from kmgr apply after boot_completed. Optional opt-in 'hold' setting is described in the prompt."
+        },
+        {
+          "id": "pstore_compress",
+          "label": "Pstore compress",
+          "path": "/sys/module/pstore/parameters/compress",
+          "type": "enum",
+          "choices": ["deflate", "lzo", "lz4", "lz4hc", "842", "zstd"],
+          "help": "Compression used for crash logs kept across reboots (pstore).",
+          "risk": "low"
+        },
+        {
+          "id": "entropy_write_wakeup",
+          "label": "Entropy write wakeup threshold",
+          "path": "/proc/sys/kernel/random/write_wakeup_threshold",
+          "type": "int",
+          "min": 0,
+          "help": "Entropy level at which writers waiting for randomness are woken.",
+          "risk": "low"
+        }
+      ]
+    },
+    {
+      "id": "custom",
+      "title": "Custom tunables",
+      "entries": [
+        {
+          "id": "user_defined",
+          "label": "Custom tunables",
+          "type": "custom",
+          "handler": "custom_tunables",
+          "help": "Add your own kernel node by absolute path and tune it like any other row.",
+          "risk": "high",
+          "note": "User adds an absolute path (allowlist roots: /sys, /proc/sys, /dev/cpuset, /dev/stune, /dev/cpuctl). Stored in /data/adb/kmgr/custom.json, then behaves like any other entry."
+        }
+      ]
+    }
+  ]
+}

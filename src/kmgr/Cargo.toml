@@ -1,0 +1,19 @@
+[package]
+name = "kmgr"
+version = "0.1.0"
+edition = "2021"
+description = "Kernel manager backend for the kmgr KernelSU module"
+
+[[bin]]
+name = "kmgr"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { version = "1", default-features = false, features = ["std"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

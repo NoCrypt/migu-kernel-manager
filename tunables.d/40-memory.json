@@ -1,0 +1,228 @@
+{
+  "group": "memory",
+  "title": "Memory",
+  "sections": [
+    {
+      "id": "zram",
+      "title": "zRAM",
+      "entries": [
+        {
+          "id": "state",
+          "label": "zRAM state",
+          "path": "/sys/block/zram0/initstate",
+          "type": "bool",
+          "handler": "zram",
+          "bundle": "zram",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "help": "Enable or disable compressed swap in RAM. Changing this recreates the zRAM device, so open apps may stutter briefly.",
+          "risk": "high"
+        },
+        {
+          "id": "size",
+          "label": "zRAM size",
+          "path": "/sys/block/zram0/disksize",
+          "type": "int",
+          "handler": "zram",
+          "bundle": "zram",
+          "unit": "bytes",
+          "display_unit": "MiB",
+          "scale": 1048576,
+          "step": 536870912,
+          "min": 0,
+          "help": "How much RAM the compressed swap area may use. Too small can starve heavy multitasking.",
+          "risk": "high"
+        },
+        {
+          "id": "algo",
+          "label": "Compression algorithm",
+          "path": "/sys/block/zram0/comp_algorithm",
+          "type": "enum_bracket",
+          "choices_from": "/sys/block/zram0/comp_algorithm",
+          "handler": "zram",
+          "bundle": "zram",
+          "help": "Compression used by zRAM. lz4 is fastest, zstd compresses more at a higher CPU cost.",
+          "risk": "medium"
+        }
+      ]
+    },
+    {
+      "id": "vm",
+      "title": "Virtual memory",
+      "entries": [
+        {
+          "id": "admin_reserve_kbytes",
+          "label": "admin_reserve_kbytes",
+          "path": "/proc/sys/vm/admin_reserve_kbytes",
+          "type": "int",
+          "zero_label": "Disabled",
+          "help": "Memory kept free for the root user, so admins can still log in when RAM is full.",
+          "risk": "low"
+        },
+        {
+          "id": "block_dump",
+          "label": "block_dump",
+          "path": "/proc/sys/vm/block_dump",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "help": "Log every block read/write to the kernel log. A debugging aid; leave off normally.",
+          "risk": "low"
+        },
+        {
+          "id": "compact_unevictable_allowed",
+          "label": "compact_unevictable_allowed",
+          "path": "/proc/sys/vm/compact_unevictable_allowed",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "help": "Allow compaction to move memory pages that are pinned. Helps fight fragmentation.",
+          "risk": "low"
+        },
+        {
+          "id": "dirty_background_bytes",
+          "label": "dirty_background_bytes",
+          "path": "/proc/sys/vm/dirty_background_bytes",
+          "type": "int",
+          "min": 0,
+          "help": "Dirty data (bytes) at which the kernel starts writing back in the background.",
+          "risk": "medium"
+        },
+        {
+          "id": "dirty_background_ratio",
+          "label": "dirty_background_ratio",
+          "path": "/proc/sys/vm/dirty_background_ratio",
+          "type": "int",
+          "min": 0,
+          "max": 100,
+          "help": "Dirty data (percent of RAM) at which the kernel starts background writeback.",
+          "risk": "medium"
+        },
+        {
+          "id": "dirty_bytes",
+          "label": "dirty_bytes",
+          "path": "/proc/sys/vm/dirty_bytes",
+          "type": "int",
+          "min": 0,
+          "help": "Dirty data (bytes) at which processes are forced to write back and stall.",
+          "risk": "medium"
+        },
+        {
+          "id": "dirty_ratio",
+          "label": "dirty_ratio",
+          "path": "/proc/sys/vm/dirty_ratio",
+          "type": "int",
+          "min": 0,
+          "max": 100,
+          "help": "Dirty data (percent of RAM) at which writes start blocking. Lower avoids long stalls.",
+          "risk": "medium"
+        },
+        {
+          "id": "dirty_expire_centisecs",
+          "label": "dirty_expire_centisecs",
+          "path": "/proc/sys/vm/dirty_expire_centisecs",
+          "type": "int",
+          "min": 0,
+          "unit": "cs",
+          "display_unit": "ms",
+          "scale": 10,
+          "help": "How long dirty data may sit before it must be written back.",
+          "risk": "low"
+        },
+        {
+          "id": "dirty_writeback_centisecs",
+          "label": "dirty_writeback_centisecs",
+          "path": "/proc/sys/vm/dirty_writeback_centisecs",
+          "type": "int",
+          "min": 0,
+          "unit": "cs",
+          "display_unit": "ms",
+          "scale": 10,
+          "help": "How often the kernel wakes up to flush dirty data.",
+          "risk": "low"
+        },
+        {
+          "id": "swappiness",
+          "label": "swappiness",
+          "path": "/proc/sys/vm/swappiness",
+          "type": "int",
+          "min": 0,
+          "max": 200,
+          "help": "How eagerly the kernel moves memory to swap. Higher frees RAM sooner but can add lag.",
+          "risk": "medium"
+        },
+        {
+          "id": "vfs_cache_pressure",
+          "label": "vfs_cache_pressure",
+          "path": "/proc/sys/vm/vfs_cache_pressure",
+          "type": "int",
+          "min": 0,
+          "help": "How aggressively the kernel reclaims directory and inode caches.",
+          "risk": "medium"
+        },
+        {
+          "id": "min_free_kbytes",
+          "label": "min_free_kbytes",
+          "path": "/proc/sys/vm/min_free_kbytes",
+          "type": "int",
+          "min": 0,
+          "help": "Free RAM the kernel keeps in reserve. Too low can cause allocation failures under load.",
+          "risk": "high"
+        },
+        {
+          "id": "extra_free_kbytes",
+          "label": "extra_free_kbytes",
+          "path": "/proc/sys/vm/extra_free_kbytes",
+          "type": "int",
+          "min": 0,
+          "help": "Extra RAM kept free beyond min_free_kbytes to speed up allocations.",
+          "risk": "high"
+        },
+        {
+          "id": "page_cluster",
+          "label": "page_cluster",
+          "path": "/proc/sys/vm/page_cluster",
+          "type": "int",
+          "min": 0,
+          "help": "Controls readahead clustering for swap. Rarely needs changing.",
+          "risk": "low"
+        },
+        {
+          "id": "overcommit_memory",
+          "label": "overcommit_memory",
+          "path": "/proc/sys/vm/overcommit_memory",
+          "type": "int",
+          "min": 0,
+          "max": 2,
+          "help": "Policy for granting more virtual memory than RAM. 0 is heuristic and safe.",
+          "risk": "medium"
+        },
+        {
+          "id": "rest",
+          "label": "Other vm tunables",
+          "type": "auto_glob",
+          "roots": [
+            "/proc/sys/vm"
+          ],
+          "name_glob": "*",
+          "skip_declared": true,
+          "exclude": [
+            "drop_caches",
+            "compact_memory",
+            "stat_refresh",
+            "oom_kill_allocating_task_*"
+          ],
+          "help": "Every other writable virtual-memory setting the kernel exposes.",
+          "risk": "medium",
+          "note": "Never expose drop_caches/compact_memory as persistable."
+        }
+      ]
+    }
+  ]
+}

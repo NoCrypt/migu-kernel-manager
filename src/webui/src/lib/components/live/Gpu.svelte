@@ -1,0 +1,32 @@
+<script>
+  import { onMount } from 'svelte';
+  import ChartPage from './ChartPage.svelte';
+  import { mountLive } from '../../live.js';
+  import { prefs } from '../../ui.svelte.js';
+  import { hzToMhz, pctSmart } from '../../format.js';
+
+  let hist = $state([]);
+  let stats = $state([]);
+  let usage = $state('—');
+
+  const live = mountLive(
+    () => `live gpu --interval ${prefs.chartInterval}`,
+    (s) => {
+      if (s.usage != null) hist = [...hist, s.usage].slice(-60);
+      usage = s.usage == null ? '—' : `${Math.round(s.usage)}%`;
+      stats = [
+        { k: 'USAGE', v: usage },
+        { k: 'SPEED', v: hzToMhz(s.cur_hz) },
+        { k: 'MAX SPEED', v: hzToMhz(s.max_hz) },
+        { k: 'MIN SPEED', v: hzToMhz(s.min_hz) }
+      ];
+    }
+  );
+
+  onMount(() => {
+    live.attach();
+    return () => live.detach();
+  });
+</script>
+
+<ChartPage {hist} {stats} label="GPU usage {usage}" />

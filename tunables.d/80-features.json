@@ -1,0 +1,67 @@
+{
+  "group": "features",
+  "title": "Kernel features (optional)",
+  "sections": [
+    {
+      "id": "features",
+      "entries": [
+        {
+          "id": "bypass_charging",
+          "label": "Bypass charging",
+          "path": "/sys/class/power_supply/battery/input_suspend",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "optional": true
+        },
+        {
+          "id": "force_fast_charge",
+          "label": "USB fast charge",
+          "path": "/sys/kernel/fast_charge/force_fast_charge",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "optional": true
+        },
+        {
+          "id": "kgsl_skip_zeroing",
+          "label": "KGSL skip pool zeroing",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "optional": true,
+          "paths": [
+            "/sys/kernel/e404/kgsl_skip_zeroing",
+            "/sys/kernel/lunar_attributes/kgsl_skip_zeroing",
+            "/sys/kernel/lunar_attributes/lunar_kgsl_skip_zeroing",
+            "/sys/kernel/n0kz_attributes/kgsl_skip_zeroing",
+            "/sys/kernel/n0kz_attributes/n0kz_kgsl_skip_zeroing",
+            "/sys/kernel/fusionx_attributes/kgsl_skip_zeroing",
+            "/sys/kernel/fusionx_attributes/fusionx_kgsl_skip_zeroing"
+          ]
+        },
+        {
+          "id": "avoid_dirty_pte",
+          "label": "Avoid dirty PTE",
+          "type": "bool",
+          "labels": {
+            "0": "Disabled",
+            "1": "Enabled"
+          },
+          "optional": true,
+          "paths": [
+            "/sys/kernel/n0kz_attributes/avoid_dirty_pte",
+            "/sys/kernel/e404/avoid_dirty_pte"
+          ]
+        }
+      ],
+      "note": "Candidate paths copied from common kernel forks. They are specific to those kernel forks and will normally be absent on other kernels; hide silently when missing. Background-blocklist node intentionally omitted."
+    }
+  ]
+}

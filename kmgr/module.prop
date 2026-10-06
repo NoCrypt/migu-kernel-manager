@@ -1,0 +1,6 @@
+id=kmgr
+name=Migu Kernel Manager
+version=v0.1.0
+versionCode=1
+author=NoCrypt
+description=Migu Kernel Manager: a kernel manager with an offline WebUI. Nothing is changed until you act.
