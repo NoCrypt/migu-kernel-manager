@@ -237,7 +237,10 @@ fn load_custom_paths() -> Vec<String> {
 fn save_custom_paths(paths: &[String]) {
     let _ = std::fs::create_dir_all(store::state_dir());
     let v = json!({ "tunables": paths });
-    let _ = std::fs::write(custom_file(), serde_json::to_string_pretty(&v).unwrap_or_default());
+    store::write_atomic(
+        &custom_file(),
+        &serde_json::to_string_pretty(&v).unwrap_or_default(),
+    );
 }
 
 pub fn custom_list() -> Value {

@@ -15,6 +15,27 @@ fn ensure_dir() {
     let _ = std::fs::create_dir_all(state_dir().join("backups"));
 }
 
+// State files are rewritten whole (applied.conf, defaults.json, settings.json,
+// custom.json). A reader in another process (e.g. `set --persist` while `apply`
+// runs) must never see a half-written file, so write to a temp file and rename.
+pub fn write_atomic(path: &std::path::Path, contents: &str) {
+    let dir = match path.parent() {
+        Some(d) => d,
+        None => return,
+    };
+    let _ = std::fs::create_dir_all(dir);
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("state");
+    let tmp = dir.join(format!(".{}.tmp.{}", name, std::process::id()));
+    if std::fs::write(&tmp, contents).is_err() {
+        return;
+    }
+    if std::fs::rename(&tmp, path).is_err() {
+        // Windows rename does not replace an existing destination.
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::rename(&tmp, path);
+    }
+}
+
 fn applied_path() -> PathBuf {
     state_dir().join("applied.conf")
 }
@@ -37,9 +58,9 @@ pub fn load_settings() -> Map<String, Value> {
 
 fn save_settings(m: &Map<String, Value>) {
     ensure_dir();
-    let _ = std::fs::write(
-        settings_path(),
-        serde_json::to_string_pretty(&Value::Object(m.clone())).unwrap_or_default(),
+    write_atomic(
+        &settings_path(),
+        &serde_json::to_string_pretty(&Value::Object(m.clone())).unwrap_or_default(),
     );
 }
 
@@ -77,7 +98,7 @@ pub fn save_applied(m: &BTreeMap<String, String>) {
     for (k, v) in m {
         s.push_str(&format!("{}={}\n", k, v));
     }
-    let _ = std::fs::write(applied_path(), s);
+    write_atomic(&applied_path(), &s);
 }
 
 pub fn persist(key: &str, value: &str) {
@@ -107,9 +128,9 @@ pub fn capture_default(key: &str, value: &str) {
     }
     ensure_dir();
     d.insert(key.to_string(), Value::String(value.to_string()));
-    let _ = std::fs::write(
-        defaults_path(),
-        serde_json::to_string_pretty(&Value::Object(d)).unwrap_or_default(),
+    write_atomic(
+        &defaults_path(),
+        &serde_json::to_string_pretty(&Value::Object(d)).unwrap_or_default(),
     );
 }
 
@@ -141,7 +162,10 @@ pub fn load_cap_est() -> Option<(i64, f64)> {
 
 pub fn save_cap_est(level: i64, value: f64) {
     ensure_dir();
-    let _ = std::fs::write(state_dir().join("cap_est"), format!("{} {}", level, value));
+    write_atomic(
+        &state_dir().join("cap_est"),
+        &format!("{} {}", level, value),
+    );
 }
 
 pub fn boot_count() -> i64 {
@@ -149,11 +173,6 @@ pub fn boot_count() -> i64 {
         .ok()
         .and_then(|s| s.trim().parse().ok())
         .unwrap_or(0)
-}
-
-pub fn reset_boot_count() {
-    ensure_dir();
-    let _ = std::fs::write(state_dir().join("boot_count"), "0");
 }
 
 pub fn set_boot_failed(failed: bool) {

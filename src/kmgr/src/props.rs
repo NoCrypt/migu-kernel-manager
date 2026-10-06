@@ -61,7 +61,7 @@ fn save_overrides(m: &BTreeMap<String, String>) {
         s.push_str(&format!("{}={}\n", k, v));
     }
     let _ = std::fs::create_dir_all(module_dir());
-    let _ = std::fs::write(system_prop(), s);
+    crate::store::write_atomic(&system_prop(), &s);
 }
 
 fn valid_key(k: &str) -> bool {
