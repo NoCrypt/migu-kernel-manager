@@ -111,6 +111,7 @@ pub fn run() -> i32 {
 
     let out: Value = json!({
         "ok": true,
+        "schema": crate::SCHEMA_VERSION,
         "kernel": kernel,
         "gpu": {
             "vendor": vendor,

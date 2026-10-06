@@ -168,6 +168,25 @@ impl Registry {
             .collect()
     }
 
+    pub fn values_map(&self) -> BTreeMap<String, Value> {
+        let mut m = BTreeMap::new();
+        for g in &self.groups {
+            for s in &g.sections {
+                for e in &s.entries {
+                    if let Some(v) = effective_value(e) {
+                        m.insert(e.key.clone(), Value::String(v));
+                    }
+                    for c in &e.children {
+                        if let Some(v) = &c.value {
+                            m.insert(c.path.clone(), Value::String(v.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        m
+    }
+
     pub fn to_json(&self) -> Value {
         let groups: Vec<Value> = self
             .groups
@@ -189,7 +208,7 @@ impl Registry {
                 json!({"id": g.id, "title": g.title, "sections": sections})
             })
             .collect();
-        json!({"groups": groups})
+        json!({"ok": true, "schema": crate::SCHEMA_VERSION, "groups": groups})
     }
 }
 

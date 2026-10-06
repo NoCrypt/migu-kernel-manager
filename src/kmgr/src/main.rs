@@ -11,26 +11,34 @@ mod write;
 
 use registry::{Kind, Registry};
 use serde_json::{json, Value};
+use std::collections::BTreeSet;
 use std::process::exit;
+
+// Bumped whenever the JSON contract changes shape. The UI compares this with the
+// value baked into its own bundle to detect a mismatched binary after an update.
+pub const SCHEMA_VERSION: u32 = 2;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
-        print_help();
+        out(&json!({"ok": false, "error": "no command", "code": 2}));
         exit(2);
     }
     let cmd = args[0].as_str();
     let rest = &args[1..];
     let code = match cmd {
-        "tree" => cmd_tree(),
+        "tree" => cmd_tree(rest),
         "get" => cmd_get(rest),
+        "get-many" => cmd_get_many(rest),
         "set" => cmd_set(rest),
+        "set-many" => cmd_set_many(rest),
         "set-path" => cmd_set_path(rest),
         "unpersist" => cmd_unpersist(rest),
         "persist" => cmd_persist(rest),
         "apply" => cmd_apply(rest),
         "reset" => cmd_reset(rest),
         "info" => cmd_info(),
+        "version" | "--version" => cmd_version(),
         "discover" => cmd_discover(),
         "monitor" => cmd_monitor(rest),
         "live" => live::run(rest),
@@ -49,16 +57,17 @@ fn main() {
             0
         }
         other => {
-            eprintln!("{}", json!({"ok": false, "error": format!("unknown command '{}'", other)}));
+            out(&json!({"ok": false, "error": format!("unknown command '{}'", other), "code": 2}));
             2
         }
     };
     exit(code);
 }
 
+
 fn print_help() {
-    eprintln!(
-        "kmgr <tree|get|set|set-path|persist|unpersist|persist-path|unpersist-path|custom|apply|reset|info|discover|monitor|live|kill|dmesg|wm|props|settings|hold-thermal|thermal-hold>"
+    println!(
+        "kmgr <tree|get|get-many|set|set-many|set-path|persist|unpersist|persist-path|unpersist-path|custom|apply|reset|info|version|discover|monitor|live|kill|dmesg|wm|props|settings|hold-thermal|thermal-hold>"
     );
 }
 
@@ -66,10 +75,28 @@ fn out(v: &Value) {
     println!("{}", serde_json::to_string(v).unwrap_or_else(|_| "{}".into()));
 }
 
-fn cmd_tree() -> i32 {
+fn cmd_tree(args: &[String]) -> i32 {
     let reg = registry::resolve();
     capture_defaults(&reg);
+    if args.iter().any(|a| a == "--values") {
+        out(&json!({
+            "ok": true,
+            "schema": SCHEMA_VERSION,
+            "values": reg.values_map(),
+        }));
+        return 0;
+    }
     out(&reg.to_json());
+    0
+}
+
+fn cmd_version() -> i32 {
+    out(&json!({
+        "ok": true,
+        "name": env!("CARGO_PKG_NAME"),
+        "version": env!("CARGO_PKG_VERSION"),
+        "schema": SCHEMA_VERSION,
+    }));
     0
 }
 
@@ -100,7 +127,7 @@ fn cmd_get(args: &[String]) -> i32 {
     let key = match args.first() {
         Some(k) => k,
         None => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr get <id>"}));
+            out(&json!({"ok": false, "error": "usage: kmgr get <id>", "code": 2}));
             return 2;
         }
     };
@@ -117,15 +144,39 @@ fn cmd_get(args: &[String]) -> i32 {
             0
         }
         None => {
-            eprintln!("{}", json!({"ok": false, "error": format!("entry '{}' not found", key)}));
+            out(&json!({"ok": false, "error": format!("entry '{}' not found", key), "code": 1}));
             1
         }
     }
 }
 
+// Cheap refresh: only key -> value, no labels/choices/paths. Also accepts
+// absolute paths for custom/submenu children.
+fn cmd_get_many(args: &[String]) -> i32 {
+    if args.is_empty() {
+        out(&json!({"ok": false, "error": "usage: kmgr get-many <key>...", "code": 2}));
+        return 2;
+    }
+    let reg = registry::resolve();
+    let mut values = serde_json::Map::new();
+    for key in args {
+        let v = if key.starts_with('/') {
+            util::read_str(key)
+        } else {
+            find_entry(&reg, key).and_then(registry::effective_value)
+        };
+        values.insert(
+            key.clone(),
+            v.map(Value::String).unwrap_or(Value::Null),
+        );
+    }
+    out(&json!({"ok": true, "schema": SCHEMA_VERSION, "values": values}));
+    0
+}
+
 fn cmd_set(args: &[String]) -> i32 {
     if args.len() < 2 {
-        eprintln!("{}", json!({"ok": false, "error": "usage: kmgr set <id> <value> [--persist]"}));
+        out(&json!({"ok": false, "error": "usage: kmgr set <id> <value> [--persist]", "code": 2}));
         return 2;
     }
     let key = &args[0];
@@ -133,10 +184,13 @@ fn cmd_set(args: &[String]) -> i32 {
     let persist = args.iter().any(|a| a == "--persist");
 
     let reg = registry::resolve();
+    // First-seen defaults must be recorded before the first write, not on the
+    // next UI refresh, or reset restores the value we just changed.
+    capture_defaults(&reg);
     let e = match find_entry(&reg, key) {
         Some(e) => e,
         None => {
-            eprintln!("{}", json!({"ok": false, "error": format!("entry '{}' not found", key)}));
+            out(&json!({"ok": false, "error": format!("entry '{}' not found", key), "code": 1}));
             return 1;
         }
     };
@@ -148,20 +202,17 @@ fn cmd_set(args: &[String]) -> i32 {
             out(&r);
             return if ok { 0 } else { 1 };
         }
-        eprintln!(
-            "{}",
-            json!({"ok": false, "error": format!("entry is handled by native handler '{}'", h)})
-        );
+        out(&json!({"ok": false, "error": format!("entry is handled by native handler '{}'", h), "code": 1}));
         return 1;
     }
     if e.kind == Kind::Custom {
-        eprintln!("{}", json!({"ok": false, "error": "entry has no writable node"}));
+        out(&json!({"ok": false, "error": "entry has no writable node", "code": 1}));
         return 1;
     }
     let path = match &e.path {
         Some(p) => p.clone(),
         None => {
-            eprintln!("{}", json!({"ok": false, "error": "entry has no path"}));
+            out(&json!({"ok": false, "error": "entry has no path", "code": 1}));
             return 1;
         }
     };
@@ -176,23 +227,95 @@ fn cmd_set(args: &[String]) -> i32 {
         }
     }
     result["key"] = json!(e.key);
+    let ok = result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
     out(&result);
-    if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if ok {
         0
     } else {
         1
     }
 }
 
+// Applies several key/value pairs as one unit. If any write fails (or is
+// rejected by read-back), the already-written nodes are restored to their
+// previous values, so bundles like KCAL RGB never end up half-applied.
+fn cmd_set_many(args: &[String]) -> i32 {
+    let persist = args.iter().any(|a| a == "--persist");
+    let positional: Vec<&String> = args.iter().filter(|a| a.as_str() != "--persist").collect();
+    if positional.is_empty() || positional.len() % 2 != 0 {
+        out(&json!({"ok": false, "error": "usage: kmgr set-many <key> <value> ... [--persist]", "code": 2}));
+        return 2;
+    }
+    let reg = registry::resolve();
+    capture_defaults(&reg);
+
+    let mut undo: Vec<(String, Option<String>)> = Vec::new();
+    let mut applied: Vec<Value> = Vec::new();
+    let mut failed: Option<Value> = None;
+
+    for pair in positional.chunks(2) {
+        let key = pair[0].as_str();
+        let value = pair[1].as_str();
+        let (path, persist_key, prior) = if key.starts_with('/') {
+            (key.to_string(), key.to_string(), util::read_str(key))
+        } else {
+            match find_entry(&reg, key) {
+                Some(e) if e.handler.is_none() && e.path.is_some() => {
+                    let p = e.path.clone().unwrap();
+                    (p.clone(), e.key.clone(), util::read_str(&p))
+                }
+                Some(_) => {
+                    failed = Some(json!({"key": key, "ok": false, "error": "entry is not a plain writable node"}));
+                    break;
+                }
+                None => {
+                    failed = Some(json!({"key": key, "ok": false, "error": "not resolved on this kernel"}));
+                    break;
+                }
+            }
+        };
+
+        let mut r = write::write_value(&path, value);
+        let ok = r.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+        if !ok {
+            r["key"] = json!(key);
+            failed = Some(r);
+            break;
+        }
+        undo.push((path.clone(), prior));
+        if persist {
+            store::persist(&persist_key, value);
+        }
+        r["key"] = json!(key);
+        applied.push(r);
+    }
+
+    if let Some(f) = failed {
+        for (path, prior) in undo.iter().rev() {
+            if let Some(v) = prior {
+                write::write_value(path, v);
+            }
+        }
+        out(&json!({"ok": false, "rolled_back": true, "failed": f, "applied": applied}));
+        return 1;
+    }
+    out(&json!({"ok": true, "applied": applied}));
+    0
+}
+
 fn cmd_set_path(args: &[String]) -> i32 {
     if args.len() < 2 {
-        eprintln!("{}", json!({"ok": false, "error": "usage: kmgr set-path <path> <value>"}));
+        out(&json!({"ok": false, "error": "usage: kmgr set-path <path> <value>", "code": 2}));
         return 2;
+    }
+    if let Some(v) = util::read_str(&args[0]) {
+        store::capture_default(&args[0], &v);
     }
     let mut r = write::write_value(&args[0], &args[1]);
     r["path"] = json!(args[0]);
+    let ok = r.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
     out(&r);
-    if r.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if ok {
         0
     } else {
         1
@@ -203,7 +326,7 @@ fn cmd_unpersist(args: &[String]) -> i32 {
     let key = match args.first() {
         Some(k) => k,
         None => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr unpersist <id>"}));
+            out(&json!({"ok": false, "error": "usage: kmgr unpersist <id>"}));
             return 2;
         }
     };
@@ -216,7 +339,7 @@ fn cmd_persist(args: &[String]) -> i32 {
     let key = match args.first() {
         Some(k) => k,
         None => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr persist <id>"}));
+            out(&json!({"ok": false, "error": "usage: kmgr persist <id>"}));
             return 2;
         }
     };
@@ -224,7 +347,7 @@ fn cmd_persist(args: &[String]) -> i32 {
     let e = match find_entry(&reg, key) {
         Some(e) => e,
         None => {
-            eprintln!("{}", json!({"ok": false, "error": format!("entry '{}' not found", key)}));
+            out(&json!({"ok": false, "error": format!("entry '{}' not found", key)}));
             return 1;
         }
     };
@@ -233,7 +356,7 @@ fn cmd_persist(args: &[String]) -> i32 {
         out(&json!({"ok": true, "key": e.key, "value": v}));
         0
     } else {
-        eprintln!("{}", json!({"ok": false, "error": "entry has no value to persist"}));
+        out(&json!({"ok": false, "error": "entry has no value to persist"}));
         1
     }
 }
@@ -258,7 +381,7 @@ fn cmd_custom(args: &[String]) -> i32 {
         Some("add") if args.len() >= 2 => out(&handlers::custom_add(&args[1])),
         Some("remove") if args.len() >= 2 => out(&handlers::custom_remove(&args[1])),
         _ => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr custom list|add|remove <path>"}));
+            out(&json!({"ok": false, "error": "usage: kmgr custom list|add|remove <path>"}));
             return 2;
         }
     }
@@ -279,7 +402,7 @@ fn cmd_props(args: &[String]) -> i32 {
         Some("unset") if args.len() >= 2 => out(&props::unset(&args[1])),
         Some("reset") => out(&props::reset()),
         _ => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr props [list [query]|set <key> <value>|unset <key>|reset]"}));
+            out(&json!({"ok": false, "error": "usage: kmgr props [list [query]|set <key> <value>|unset <key>|reset]"}));
             return 2;
         }
     }
@@ -294,7 +417,7 @@ fn cmd_settings(args: &[String]) -> i32 {
         Some("set") if args.len() >= 3 => {
             let key = &args[1];
             if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                eprintln!("{}", json!({"ok": false, "error": "invalid setting key"}));
+                out(&json!({"ok": false, "error": "invalid setting key"}));
                 return 2;
             }
             let value = args[2..].join(" ");
@@ -306,7 +429,7 @@ fn cmd_settings(args: &[String]) -> i32 {
             out(&json!({"ok": true}));
         }
         _ => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr settings [list|set <key> <value>|unset <key>]"}));
+            out(&json!({"ok": false, "error": "usage: kmgr settings [list|set <key> <value>|unset <key>]"}));
             return 2;
         }
     }
@@ -324,7 +447,7 @@ fn cmd_wm(args: &[String]) -> i32 {
         (Some("density"), Some(v)) => out(&display::set_density(v)),
         (Some("reset"), _) => out(&display::reset()),
         _ => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr wm [status|reset|size <WxH>|size reset|density <N>|density reset]"}));
+            out(&json!({"ok": false, "error": "usage: kmgr wm [status|reset|size <WxH>|size reset|density <N>|density reset]"}));
             return 2;
         }
     }
@@ -335,12 +458,12 @@ fn cmd_persist_path(args: &[String]) -> i32 {
     let path = match args.first() {
         Some(p) => p,
         None => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr persist-path <path>"}));
+            out(&json!({"ok": false, "error": "usage: kmgr persist-path <path>"}));
             return 2;
         }
     };
     if !write::allowed_logical(path) {
-        eprintln!("{}", json!({"ok": false, "error": "path is not in an allowed root"}));
+        out(&json!({"ok": false, "error": "path is not in an allowed root"}));
         return 1;
     }
     let v = util::read_str(path).unwrap_or_default();
@@ -353,7 +476,7 @@ fn cmd_unpersist_path(args: &[String]) -> i32 {
     let path = match args.first() {
         Some(p) => p,
         None => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr unpersist-path <path>"}));
+            out(&json!({"ok": false, "error": "usage: kmgr unpersist-path <path>"}));
             return 2;
         }
     };
@@ -374,7 +497,7 @@ fn cmd_thermal_hold(args: &[String]) -> i32 {
             out(&json!({"ok": true, "on": false}));
         }
         _ => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr thermal-hold [on|off]"}));
+            out(&json!({"ok": false, "error": "usage: kmgr thermal-hold [on|off]"}));
             return 2;
         }
     }
@@ -392,17 +515,34 @@ fn cmd_apply(_args: &[String]) -> i32 {
     }
 
     let reg = registry::resolve();
+    // Record pre-apply values as the first-seen defaults before anything is
+    // written; apply itself runs at boot, before the UI ever calls tree.
+    capture_defaults(&reg);
     let applied = store::load_applied();
     let mut results: Vec<Value> = Vec::new();
     let mut handled: Vec<(String, String)> = Vec::new();
     let mut zram_seen = false;
 
-    // Order freq pairs by write_order; everything else in stable key order.
+    // Replay in registry order (groups -> sections -> entries), never file order,
+    // so paired min/max nodes are written in the same order the UI writes them.
+    // Keys that no longer resolve (or absolute paths) come last, in stable order.
     let mut ordered: Vec<(String, String)> = Vec::new();
-    for (k, v) in &applied {
-        ordered.push((k.clone(), v.clone()));
+    let mut used: BTreeSet<String> = BTreeSet::new();
+    for g in &reg.groups {
+        for s in &g.sections {
+            for e in &s.entries {
+                if let Some(v) = applied.get(&e.key) {
+                    ordered.push((e.key.clone(), v.clone()));
+                    used.insert(e.key.clone());
+                }
+            }
+        }
     }
-    ordered.sort_by(|a, b| a.0.cmp(&b.0));
+    for (k, v) in &applied {
+        if !used.contains(k) {
+            ordered.push((k.clone(), v.clone()));
+        }
+    }
 
     for (key, value) in &ordered {
         if key.starts_with('/') {
@@ -450,8 +590,9 @@ fn cmd_apply(_args: &[String]) -> i32 {
         .iter()
         .all(|r| r.get("ok").and_then(|v| v.as_bool()).unwrap_or(false));
 
-    store::reset_boot_count();
-    store::set_boot_failed(false);
+    // The boot_count is NOT cleared here. service.sh clears it only after the
+    // device has stayed up past a settle window, so a setting that crashes the
+    // device shortly after a "successful" apply still trips the guard.
     out(&json!({"ok": all_ok, "applied": results}));
     0
 }

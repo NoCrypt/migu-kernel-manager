@@ -153,12 +153,12 @@ MON="$("$KMGR_BIN" monitor --interval 200 2>/dev/null | head -2)"
 has "monitor cores" "$MON" '"cores"'
 has "monitor cluster title" "$MON" '"Little cluster"'
 has "monitor gpu busy" "$MON" '"busy":12'
-has "monitor gpu model not in sample" "$MON" '"cur":305000000'
+has "monitor gpu model not in sample" "$MON" '"cur_hz":305000000'
 has "monitor battery" "$MON" '"capacity":76'
 has "monitor mem" "$MON" '"total":5694'
 has "monitor loadavg" "$MON" '"loadavg":\[0.5,0.4,0.3\]'
 has "monitor cpu_temp" "$MON" '"cpu_temp":38.5'
-has "monitor cluster cur" "$MON" '"cur":1804800'
+has "monitor cluster cur" "$MON" '"cur_khz":1804800'
 has "monitor zram total" "$MON" '"total":2048'
 has "monitor zram used" "$MON" '"used":1024'
 has "monitor entropy avail" "$MON" '"avail":256'
@@ -221,6 +221,35 @@ SG="$("$KMGR_BIN" settings)"
 has "settings get" "$SG" '"accent":"#2196f3"'
 "$KMGR_BIN" settings unset accent >/dev/null 2>&1
 hasnt "settings unset" "$("$KMGR_BIN" settings)" '"accent"'
+
+# 9. schema / version handshake
+V="$("$KMGR_BIN" version)"
+has "version ok"     "$V" '"ok":true'
+has "version name"   "$V" '"name":"kmgr"'
+has "version schema" "$V" '"schema":2'
+has "tree schema"    "$TREE" '"schema":2'
+
+# 10. get-many (cheap refresh)
+GM="$("$KMGR_BIN" get-many cpu.cluster.policy0.governor cpu.cluster.policy0.max_freq)"
+has "get-many governor" "$GM" '"cpu.cluster.policy0.governor":"performance"'
+has "get-many max"      "$GM" '"cpu.cluster.policy0.max_freq":"1017600"'
+
+# 11. tree --values (values only, no labels/choices/paths)
+TV="$("$KMGR_BIN" tree --values)"
+has "tree values map"      "$TV" '"values"'
+has "tree values governor" "$TV" '"cpu.cluster.policy0.governor":"performance"'
+hasnt "tree values no groups" "$TV" '"groups"'
+
+# 12. set-many is atomic and rolls back on the first failure
+SM="$("$KMGR_BIN" set-many cpu.cluster.policy0.min_freq 576000 cpu.cluster.policy0.max_freq 1017600) || true"
+has "set-many ok" "$SM" '"ok":true'
+has "set-many rollback" "$("$KMGR_BIN" set-many cpu.cluster.policy0.min_freq 710400 /sys/devices/system/cpu/cpufreq/policy0/nope 1)" '"rolled_back":true'
+ok "set-many restored min" "$(cat "$FAKE/sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq")" "576000"
+
+# 13. usage errors are JSON on stdout (exit 2), never bare stderr text
+EU="$("$KMGR_BIN" get 2>/dev/null)"; rc=$?
+has "usage error is json" "$EU" '"ok":false'
+ok "usage error exit code" "$rc" "2"
 
 echo "---"
 echo "pass=$pass fail=$fail"

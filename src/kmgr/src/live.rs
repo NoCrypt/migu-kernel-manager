@@ -27,7 +27,7 @@ pub fn run(args: &[String]) -> i32 {
         "wakelocks" => wakelocks(&args[1..]),
         "thermal" => thermal(&args[1..]),
         _ => {
-            eprintln!("{}", json!({"ok": false, "error": "usage: kmgr live <tab>"}));
+            println!("{}", json!({"ok": false, "error": "usage: kmgr live <tab>", "code": 2}));
             2
         }
     }
@@ -1099,7 +1099,7 @@ fn dmesg_export() -> i32 {
             0
         }
         Err(e) => {
-            eprintln!("{}", json!({"ok": false, "error": e.to_string()}));
+            println!("{}", json!({"ok": false, "error": e.to_string()}));
             1
         }
     }
