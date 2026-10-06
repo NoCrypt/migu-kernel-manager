@@ -10,6 +10,27 @@ const ALLOWED: &[&str] = &[
     "/dev/cpuctl",
 ];
 
+// Linux O_NOFOLLOW: refuse to follow a symlink in the final path component.
+#[cfg(unix)]
+const O_NOFOLLOW: i32 = 0o400000;
+
+// Resolving a path with realpath and then re-opening the original string leaves
+// a TOCTOU window. We always open the canonical target, and O_NOFOLLOW makes the
+// kernel reject it if the final component was swapped for a symlink in between.
+#[cfg(unix)]
+fn open_write_nofollow(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .custom_flags(O_NOFOLLOW)
+        .open(path)
+}
+
+#[cfg(not(unix))]
+fn open_write_nofollow(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    std::fs::OpenOptions::new().write(true).open(path)
+}
+
 pub fn allowed_logical(path: &str) -> bool {
     if path.contains("..") || !path.starts_with('/') {
         return false;
@@ -26,8 +47,10 @@ pub fn write_value(path: &str, value: &str) -> Value {
     }
     let rp = rooted(path);
 
-    if let Some(r) = root() {
-        if let Ok(canon) = std::fs::canonicalize(&rp) {
+    // Resolve first, verify containment, then open the resolved target.
+    let mut target = rp.clone();
+    if let Ok(canon) = std::fs::canonicalize(&rp) {
+        if let Some(r) = root() {
             if let Ok(croot) = std::fs::canonicalize(&r) {
                 if !canon.starts_with(&croot) {
                     return json!({"ok": false, "requested": value, "actual": Value::Null,
@@ -35,12 +58,10 @@ pub fn write_value(path: &str, value: &str) -> Value {
                 }
             }
         }
+        target = canon;
     }
 
-    let res = std::fs::OpenOptions::new()
-        .write(true)
-        .open(&rp)
-        .and_then(|mut f| f.write_all(value.as_bytes()));
+    let res = open_write_nofollow(&target).and_then(|mut f| f.write_all(value.as_bytes()));
 
     if let Err(e) = res {
         return json!({"ok": false, "requested": value, "actual": Value::Null,
