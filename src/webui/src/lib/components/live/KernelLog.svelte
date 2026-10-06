@@ -67,12 +67,14 @@
       </div>
     {/each}
   </div>
-  <div class="klog-jump">
-    <button aria-label="Scroll to top" onclick={toTop}>
-      <Icon name="chevronUp" size={20} />
-    </button>
-    <button aria-label="Scroll to bottom" onclick={toBottom}>
-      <Icon name="chevronDown" size={20} />
-    </button>
-  </div>
+  {#if !klog.searchOpen}
+    <div class="klog-jump">
+      <button aria-label="Scroll to top" onclick={toTop}>
+        <Icon name="chevronUp" size={20} />
+      </button>
+      <button aria-label="Scroll to bottom" onclick={toBottom}>
+        <Icon name="chevronDown" size={20} />
+      </button>
+    </div>
+  {/if}
 </div>
