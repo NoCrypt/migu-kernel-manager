@@ -1047,7 +1047,7 @@ fn dmesg(args: &[String]) -> i32 {
             seed.push(rec);
         }
     }
-    let start = seed.len().saturating_sub(5000);
+    let start = seed.len().saturating_sub(1000);
     let mut last = opts.since;
     for (seq, line) in &seed[start..] {
         if !emit(&mut lock, &json!({"n": seq, "t": line})) {
